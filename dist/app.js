@@ -26,6 +26,51 @@ class DOMHelpers {
         el.addEventListener(eventType, handler.bind(this));
     }
 }
+class ProjectState {
+    constructor() {
+        this._projects = [];
+        this._listeners = [];
+    }
+    static getInstance() {
+        if (this._instance)
+            return this._instance;
+        const instance = new ProjectState();
+        return instance;
+    }
+    addProject(title, description, people) {
+        this._projects.push(new Project(title, description, people));
+        this._publish();
+    }
+    addListener(handler) {
+        this._listeners.push(handler);
+    }
+    _publish() {
+        this._listeners.forEach((listener) => {
+            listener(this._projects.slice());
+        });
+    }
+}
+const projectState = ProjectState.getInstance();
+class Project {
+    constructor(_title, _description, _people) {
+        this._title = _title;
+        this._description = _description;
+        this._people = _people;
+        this._uniqueId = Math.random().toString();
+    }
+    get uniqueId() {
+        return this._uniqueId;
+    }
+    get title() {
+        return this._title;
+    }
+    get description() {
+        return this._description;
+    }
+    get people() {
+        return this._people;
+    }
+}
 const AutoBind = (_, _2, propertyDescriptor) => {
     return {
         configurable: true,
@@ -37,6 +82,42 @@ const AutoBind = (_, _2, propertyDescriptor) => {
         },
     };
 };
+class ProjectList {
+    constructor(type) {
+        this.type = type;
+        this._assignedProjects = [];
+        const { getById, getNode } = DOMHelpers;
+        this.templateElement = getById("project-list");
+        this.hostElement = getById("app");
+        const importedNode = getNode(this.templateElement.content, true);
+        this.element = importedNode.firstElementChild;
+        this.element.id = `${this.type}-projects`;
+        projectState.addListener((projects) => {
+            this._assignedProjects = projects;
+            this._renderProjects();
+        });
+        this._attach();
+        this._renderContent();
+    }
+    _renderProjects() {
+        const { getById } = DOMHelpers;
+        const listEl = getById(`${this.type}-projects-list`);
+        this._assignedProjects.forEach((project) => {
+            const listItem = document.createElement("li");
+            listItem.textContent = project.title;
+            listEl.appendChild(listItem);
+        });
+    }
+    _renderContent() {
+        const { findEl } = DOMHelpers;
+        const listId = `${this.type}-projects-list`;
+        findEl("ul", this.element).id = listId;
+        findEl("h2", this.element).textContent = `${this.type.toUpperCase()} PROJECTS`;
+    }
+    _attach() {
+        this.hostElement.insertAdjacentElement("beforeend", this.element);
+    }
+}
 class ProjectInput {
     constructor() {
         const { getById, getNode, findEl, configureListener } = DOMHelpers;
@@ -110,6 +191,10 @@ class ProjectInput {
     _handleSubmit(event) {
         event.preventDefault();
         const userInput = this._gatherUserInput();
+        if (Array.isArray(userInput)) {
+            const [title, description, people] = userInput;
+            projectState.addProject(title, description, people);
+        }
         console.log(userInput);
     }
     _attach() {
@@ -120,4 +205,6 @@ __decorate([
     AutoBind
 ], ProjectInput.prototype, "_handleSubmit", null);
 const input = new ProjectInput();
+const activeProjectList = new ProjectList("active");
+const finishedProjectList = new ProjectList("finished");
 //# sourceMappingURL=app.js.map
