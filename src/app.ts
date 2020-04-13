@@ -30,14 +30,65 @@ class DOMHelpers {
   }
 }
 
-type Listener = (projects: Project[]) => void;
+enum ProjectStatus {
+  Active,
+  Inactive,
+}
 
-class ProjectState {
+class Project {
+  private _uniqueId: string = Math.random().toString();
+
+  constructor(
+    private _title: string,
+    private _description: string,
+    private _people: number,
+    private _status: ProjectStatus
+  ) {}
+
+  get uniqueId(): string {
+    return this._uniqueId;
+  }
+
+  get title(): string {
+    return this._title;
+  }
+
+  get description(): string {
+    return this._description;
+  }
+
+  get people(): number {
+    return this._people;
+  }
+
+  get status(): ProjectStatus.Active | ProjectStatus.Inactive {
+    return this._status;
+  }
+}
+
+type Listener<T> = (projects: T[]) => void;
+
+class State<T> {
+  protected listeners: Listener<T>[] = [];
+
+  addListener(listenerFn: Listener<T>) {
+    this.listeners.push(listenerFn);
+  }
+
+  protected publish(data: T[]) {
+    this.listeners.forEach((listener) => {
+      listener(data);
+    });
+  }
+}
+
+class ProjectState extends State<Project> {
   private _projects: Project[] = [];
-  private _listeners: Listener[] = [];
   private static _instance: ProjectState;
 
-  private constructor() {}
+  private constructor() {
+    super();
+  }
 
   static getInstance() {
     if (this._instance) return this._instance;
@@ -49,17 +100,7 @@ class ProjectState {
     this._projects.push(
       new Project(title, description, people, ProjectStatus.Active)
     );
-    this._publish();
-  }
-
-  addListener(handler: Listener) {
-    this._listeners.push(handler);
-  }
-
-  private _publish() {
-    this._listeners.forEach((listener) => {
-      listener(this._projects.slice());
-    });
+    this.publish(this._projects.slice());
   }
 }
 const projectState = ProjectState.getInstance();
@@ -97,42 +138,6 @@ abstract class Component<
 
   abstract configure(): void;
   abstract renderContent(): void;
-}
-
-enum ProjectStatus {
-  Active,
-  Inactive,
-}
-
-class Project {
-  private _uniqueId: string = Math.random().toString();
-
-  constructor(
-    private _title: string,
-    private _description: string,
-    private _people: number,
-    private _status: ProjectStatus
-  ) {}
-
-  get uniqueId(): string {
-    return this._uniqueId;
-  }
-
-  get title(): string {
-    return this._title;
-  }
-
-  get description(): string {
-    return this._description;
-  }
-
-  get people(): number {
-    return this._people;
-  }
-
-  get status(): ProjectStatus.Active | ProjectStatus.Inactive {
-    return this._status;
-  }
 }
 
 interface Validatable {
@@ -211,6 +216,7 @@ class ProjectInput extends Component<HTMLDivElement, HTMLElement> {
 
   constructor() {
     super("project-input", "app", true, `user-input`);
+    this.configure();
   }
 
   configure() {

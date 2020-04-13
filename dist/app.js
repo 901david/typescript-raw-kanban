@@ -29,47 +29,6 @@ class DOMHelpers {
         element.innerHTML = "";
     }
 }
-class ProjectState {
-    constructor() {
-        this._projects = [];
-        this._listeners = [];
-    }
-    static getInstance() {
-        if (this._instance)
-            return this._instance;
-        const instance = new ProjectState();
-        return instance;
-    }
-    addProject(title, description, people) {
-        this._projects.push(new Project(title, description, people, ProjectStatus.Active));
-        this._publish();
-    }
-    addListener(handler) {
-        this._listeners.push(handler);
-    }
-    _publish() {
-        this._listeners.forEach((listener) => {
-            listener(this._projects.slice());
-        });
-    }
-}
-const projectState = ProjectState.getInstance();
-class Component extends DOMHelpers {
-    constructor(templateId, hostElementId, insertAtBeginning, newElementId) {
-        super();
-        this.insertAtBeginning = insertAtBeginning;
-        this.templateElement = this.getById(templateId);
-        this.hostElement = this.getById(hostElementId);
-        const importedNode = this.getNode(this.templateElement.content, true);
-        this.element = importedNode.firstElementChild;
-        if (newElementId)
-            this.element.id = newElementId;
-        this.attach();
-    }
-    attach() {
-        this.hostElement.insertAdjacentElement(this.insertAtBeginning ? "afterbegin" : "beforeend", this.element);
-    }
-}
 var ProjectStatus;
 (function (ProjectStatus) {
     ProjectStatus[ProjectStatus["Active"] = 0] = "Active";
@@ -97,6 +56,52 @@ class Project {
     }
     get status() {
         return this._status;
+    }
+}
+class State {
+    constructor() {
+        this.listeners = [];
+    }
+    addListener(listenerFn) {
+        this.listeners.push(listenerFn);
+    }
+    publish(data) {
+        this.listeners.forEach((listener) => {
+            listener(data);
+        });
+    }
+}
+class ProjectState extends State {
+    constructor() {
+        super();
+        this._projects = [];
+    }
+    static getInstance() {
+        if (this._instance)
+            return this._instance;
+        const instance = new ProjectState();
+        return instance;
+    }
+    addProject(title, description, people) {
+        this._projects.push(new Project(title, description, people, ProjectStatus.Active));
+        this.publish(this._projects.slice());
+    }
+}
+const projectState = ProjectState.getInstance();
+class Component extends DOMHelpers {
+    constructor(templateId, hostElementId, insertAtBeginning, newElementId) {
+        super();
+        this.insertAtBeginning = insertAtBeginning;
+        this.templateElement = this.getById(templateId);
+        this.hostElement = this.getById(hostElementId);
+        const importedNode = this.getNode(this.templateElement.content, true);
+        this.element = importedNode.firstElementChild;
+        if (newElementId)
+            this.element.id = newElementId;
+        this.attach();
+    }
+    attach() {
+        this.hostElement.insertAdjacentElement(this.insertAtBeginning ? "afterbegin" : "beforeend", this.element);
     }
 }
 const AutoBind = (_, _2, propertyDescriptor) => {
@@ -149,6 +154,7 @@ class ProjectList extends Component {
 class ProjectInput extends Component {
     constructor() {
         super("project-input", "app", true, `user-input`);
+        this.configure();
     }
     configure() {
         this.titleInputEl = this.findEl("#title", this.element);
