@@ -1,3 +1,39 @@
+enum ProjectStatus {
+  Active,
+  Inactive,
+}
+
+type Listener<T> = (projects: T[]) => void;
+
+type UserInput = [string, string, number];
+
+type ValidationError = { error: string };
+
+interface Validatable {
+  value: string | number;
+  isRequired?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+}
+
+interface Draggable {}
+
+interface Droppable {}
+
+const AutoBind = (_: any, _2: any, propertyDescriptor: PropertyDescriptor) => {
+  return {
+    configurable: true,
+    enumerable: true,
+    get() {
+      const origFN = propertyDescriptor.value;
+      const boundFn = origFN.bind(this);
+      return boundFn;
+    },
+  };
+};
+
 class DOMHelpers {
   findEl<T extends HTMLElement>(tag: string, ref?: T) {
     if (ref !== undefined) return ref.querySelector(tag)!;
@@ -29,81 +65,6 @@ class DOMHelpers {
     element.innerHTML = "";
   }
 }
-
-enum ProjectStatus {
-  Active,
-  Inactive,
-}
-
-class Project {
-  private _uniqueId: string = Math.random().toString();
-
-  constructor(
-    private _title: string,
-    private _description: string,
-    private _people: number,
-    private _status: ProjectStatus
-  ) {}
-
-  get uniqueId(): string {
-    return this._uniqueId;
-  }
-
-  get title(): string {
-    return this._title;
-  }
-
-  get description(): string {
-    return this._description;
-  }
-
-  get people(): number {
-    return this._people;
-  }
-
-  get status(): ProjectStatus.Active | ProjectStatus.Inactive {
-    return this._status;
-  }
-}
-
-type Listener<T> = (projects: T[]) => void;
-
-class State<T> {
-  protected listeners: Listener<T>[] = [];
-
-  addListener(listenerFn: Listener<T>) {
-    this.listeners.push(listenerFn);
-  }
-
-  protected publish(data: T[]) {
-    this.listeners.forEach((listener) => {
-      listener(data);
-    });
-  }
-}
-
-class ProjectState extends State<Project> {
-  private _projects: Project[] = [];
-  private static _instance: ProjectState;
-
-  private constructor() {
-    super();
-  }
-
-  static getInstance() {
-    if (this._instance) return this._instance;
-    const instance = new ProjectState();
-    return instance;
-  }
-
-  addProject(title: string, description: string, people: number) {
-    this._projects.push(
-      new Project(title, description, people, ProjectStatus.Active)
-    );
-    this.publish(this._projects.slice());
-  }
-}
-const projectState = ProjectState.getInstance();
 
 abstract class Component<
   T extends HTMLElement,
@@ -140,30 +101,92 @@ abstract class Component<
   abstract renderContent(): void;
 }
 
-interface Validatable {
-  value: string | number;
-  isRequired?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  min?: number;
-  max?: number;
+class Project {
+  private _uniqueId: string = Math.random().toString();
+
+  constructor(
+    private _title: string,
+    private _description: string,
+    private _people: number,
+    private _status: ProjectStatus
+  ) {}
+
+  get uniqueId(): string {
+    return this._uniqueId;
+  }
+
+  get title(): string {
+    return this._title;
+  }
+
+  get description(): string {
+    return this._description;
+  }
+
+  get people(): number {
+    return this._people;
+  }
+
+  get status(): ProjectStatus.Active | ProjectStatus.Inactive {
+    return this._status;
+  }
 }
 
-const AutoBind = (_: any, _2: any, propertyDescriptor: PropertyDescriptor) => {
-  return {
-    configurable: true,
-    enumerable: true,
-    get() {
-      const origFN = propertyDescriptor.value;
-      const boundFn = origFN.bind(this);
-      return boundFn;
-    },
-  };
-};
+class State<T> {
+  protected listeners: Listener<T>[] = [];
 
-type UserInput = [string, string, number];
+  addListener(listenerFn: Listener<T>) {
+    this.listeners.push(listenerFn);
+  }
 
-type ValidationError = { error: string };
+  protected publish(data: T[]) {
+    this.listeners.forEach((listener) => {
+      listener(data);
+    });
+  }
+}
+
+class ProjectState extends State<Project> {
+  private _projects: Project[] = [];
+  private static _instance: ProjectState;
+
+  private constructor() {
+    super();
+  }
+
+  static getInstance() {
+    if (this._instance) return this._instance;
+    const instance = new ProjectState();
+    return instance;
+  }
+
+  addProject(title: string, description: string, people: number) {
+    this._projects.push(
+      new Project(title, description, people, ProjectStatus.Active)
+    );
+    this.publish(this._projects.slice());
+  }
+}
+
+class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
+  constructor(hostId: string, private _project: Project) {
+    super("single-project", hostId, false, _project.uniqueId);
+    this.configure();
+    this.renderContent();
+  }
+  configure() {}
+
+  renderContent() {
+    this.findEl("h2", this.element)!.textContent = this._project.title;
+    this.findEl("h3", this.element)!.textContent = this.peopleText;
+    this.findEl("p", this.element)!.textContent = this._project.description;
+  }
+
+  get peopleText(): string {
+    const { people: numPeople } = this._project;
+    return `${numPeople} Person${numPeople !== 1 ? "s" : ""} Assigned`;
+  }
+}
 
 class ProjectList extends Component<HTMLDivElement, HTMLElement> {
   private _projectsToShow: Project[] = [];
@@ -193,9 +216,7 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
     const listEl = <HTMLUListElement>this.getById(`${this.type}-projects-list`);
     this.empty(listEl);
     this._projectsToShow.forEach((project) => {
-      const listItem = document.createElement("li");
-      listItem.textContent = project.title;
-      listEl.appendChild(listItem);
+      new ProjectItem(this.findEl("ul", this.element)!.id, project);
     });
   }
 
@@ -304,10 +325,10 @@ class ProjectInput extends Component<HTMLDivElement, HTMLElement> {
       const [title, description, people] = userInput;
       projectState.addProject(title, description, people);
     }
-
-    console.log(userInput);
   }
 }
+
+const projectState = ProjectState.getInstance();
 
 const input = new ProjectInput();
 const activeProjectList = new ProjectList("active");

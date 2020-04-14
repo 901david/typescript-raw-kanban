@@ -5,6 +5,22 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var ProjectStatus;
+(function (ProjectStatus) {
+    ProjectStatus[ProjectStatus["Active"] = 0] = "Active";
+    ProjectStatus[ProjectStatus["Inactive"] = 1] = "Inactive";
+})(ProjectStatus || (ProjectStatus = {}));
+const AutoBind = (_, _2, propertyDescriptor) => {
+    return {
+        configurable: true,
+        enumerable: true,
+        get() {
+            const origFN = propertyDescriptor.value;
+            const boundFn = origFN.bind(this);
+            return boundFn;
+        },
+    };
+};
 class DOMHelpers {
     findEl(tag, ref) {
         if (ref !== undefined)
@@ -29,11 +45,22 @@ class DOMHelpers {
         element.innerHTML = "";
     }
 }
-var ProjectStatus;
-(function (ProjectStatus) {
-    ProjectStatus[ProjectStatus["Active"] = 0] = "Active";
-    ProjectStatus[ProjectStatus["Inactive"] = 1] = "Inactive";
-})(ProjectStatus || (ProjectStatus = {}));
+class Component extends DOMHelpers {
+    constructor(templateId, hostElementId, insertAtBeginning, newElementId) {
+        super();
+        this.insertAtBeginning = insertAtBeginning;
+        this.templateElement = this.getById(templateId);
+        this.hostElement = this.getById(hostElementId);
+        const importedNode = this.getNode(this.templateElement.content, true);
+        this.element = importedNode.firstElementChild;
+        if (newElementId)
+            this.element.id = newElementId;
+        this.attach();
+    }
+    attach() {
+        this.hostElement.insertAdjacentElement(this.insertAtBeginning ? "afterbegin" : "beforeend", this.element);
+    }
+}
 class Project {
     constructor(_title, _description, _people, _status) {
         this._title = _title;
@@ -87,34 +114,24 @@ class ProjectState extends State {
         this.publish(this._projects.slice());
     }
 }
-const projectState = ProjectState.getInstance();
-class Component extends DOMHelpers {
-    constructor(templateId, hostElementId, insertAtBeginning, newElementId) {
-        super();
-        this.insertAtBeginning = insertAtBeginning;
-        this.templateElement = this.getById(templateId);
-        this.hostElement = this.getById(hostElementId);
-        const importedNode = this.getNode(this.templateElement.content, true);
-        this.element = importedNode.firstElementChild;
-        if (newElementId)
-            this.element.id = newElementId;
-        this.attach();
+class ProjectItem extends Component {
+    constructor(hostId, _project) {
+        super("single-project", hostId, false, _project.uniqueId);
+        this._project = _project;
+        this.configure();
+        this.renderContent();
     }
-    attach() {
-        this.hostElement.insertAdjacentElement(this.insertAtBeginning ? "afterbegin" : "beforeend", this.element);
+    configure() { }
+    renderContent() {
+        this.findEl("h2", this.element).textContent = this._project.title;
+        this.findEl("h3", this.element).textContent = this.peopleText;
+        this.findEl("p", this.element).textContent = this._project.description;
+    }
+    get peopleText() {
+        const { people: numPeople } = this._project;
+        return `${numPeople} Person${numPeople !== 1 ? "s" : ""} Assigned`;
     }
 }
-const AutoBind = (_, _2, propertyDescriptor) => {
-    return {
-        configurable: true,
-        enumerable: true,
-        get() {
-            const origFN = propertyDescriptor.value;
-            const boundFn = origFN.bind(this);
-            return boundFn;
-        },
-    };
-};
 class ProjectList extends Component {
     constructor(type) {
         super("project-list", "app", false, `${type}-projects`);
@@ -140,9 +157,7 @@ class ProjectList extends Component {
         const listEl = this.getById(`${this.type}-projects-list`);
         this.empty(listEl);
         this._projectsToShow.forEach((project) => {
-            const listItem = document.createElement("li");
-            listItem.textContent = project.title;
-            listEl.appendChild(listItem);
+            new ProjectItem(this.findEl("ul", this.element).id, project);
         });
     }
     renderContent() {
@@ -226,12 +241,12 @@ class ProjectInput extends Component {
             const [title, description, people] = userInput;
             projectState.addProject(title, description, people);
         }
-        console.log(userInput);
     }
 }
 __decorate([
     AutoBind
 ], ProjectInput.prototype, "_handleSubmit", null);
+const projectState = ProjectState.getInstance();
 const input = new ProjectInput();
 const activeProjectList = new ProjectList("active");
 const finishedProjectList = new ProjectList("finished");
